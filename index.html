@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Laberinto VR de Preguntas :-)</title>
+<style>
+  :root{
+    --bg: #101a30;
+    --panel: #16233f;
+    --accent: #ff8c1a;
+    --accent2: #3fa7ff;
+    --ok: #33c17a;
+    --bad: #e5484d;
+    --text: #e9edf2;
+    --muted: #8b96a5;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:#000;overflow:hidden;
+    font-family:'Segoe UI',Roboto,system-ui,-apple-system,sans-serif;color:var(--text);}
+  canvas{display:block;}
+
+  #app-canvas{position:fixed;inset:0;}
+
+  .screen{
+    position:fixed;inset:0;z-index:20;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 20%, #1c2c4d 0%, #0a1122 70%);
+    padding:24px;
+  }
+  .card{
+    width:min(640px,92vw);
+    background:var(--panel);
+    border:1px solid #2a3a5c;
+    border-radius:10px;
+    padding:32px 30px;
+    box-shadow:0 20px 60px rgba(0,0,0,.55);
+    max-height:88vh;
+    overflow-y:auto;
+  }
+  .eyebrow{
+    text-transform:uppercase;letter-spacing:.18em;font-size:12px;color:var(--accent);
+    font-weight:700;margin-bottom:6px;
+  }
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.01em;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px;line-height:1.5;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .btn{
+    appearance:none;border:none;cursor:pointer;
+    background:var(--accent);color:#1a1200;font-weight:700;
+    padding:13px 22px;border-radius:7px;font-size:15px;
+    letter-spacing:.02em;transition:transform .08s ease, background .15s;
+  }
+  .btn:hover{background:#ffa03d;}
+  .btn:active{transform:scale(.97);}
+  .btn.secondary{background:#2b323c;color:var(--text);}
+  .btn.secondary:hover{background:#38414d;}
+  .btn.ghost{background:transparent;border:1px solid #394252;color:var(--text);}
+  .file-label{
+    display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border-radius:7px;
+    background:#232a33;border:1px dashed #3c4653;color:var(--muted);font-size:13px;cursor:pointer;
+  }
+  .file-label:hover{border-color:var(--accent2);color:var(--text);}
+  #file-name{font-size:12px;color:var(--accent2);}
+  ul.instructions{margin:0 0 20px;padding-left:18px;color:var(--muted);font-size:13.5px;line-height:1.9;}
+  ul.instructions b{color:var(--text);}
+  .divider{height:1px;background:#2c333d;margin:18px 0;}
+  .status{font-size:12px;color:var(--muted);margin-top:10px;min-height:16px;}
+  .status.warn{color:var(--bad);}
+
+  #hint{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:15;background:rgba(15,17,20,.72);border:1px solid #2c333d;
+    padding:8px 16px;border-radius:20px;font-size:12.5px;color:var(--muted);
+    letter-spacing:.02em;pointer-events:none;
+  }
+
+  /* controles táctiles (modo móvil) */
+  #mobile-controls{ position:fixed; inset:0; z-index:15; pointer-events:none; }
+  #mobile-controls.hidden{ display:none; }
+  #minimap-mobile{
+    position:fixed; left:16px; bottom:206px;
+    width:150px; height:150px; z-index:16;
+    border:2px solid var(--accent); border-radius:8px;
+    overflow:hidden; pointer-events:none;
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  #minimap-mobile.hidden{ display:none; }
+
+  #dpad{
+    position:absolute; left:16px; bottom:16px;
+    width:174px; height:174px;
+    display:grid; grid-template-columns:56px 58px 56px; grid-template-rows:56px 58px 56px;
+    pointer-events:auto;
+  }
+  .dpad-btn{
+    background:rgba(28,33,40,.6); border:1px solid rgba(255,140,26,.55);
+    color:var(--accent); font-size:22px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; touch-action:none;
+  }
+  .dpad-btn.active{ background:rgba(255,140,26,.35); }
+  .dpad-up{ grid-column:2; grid-row:1; }
+  .dpad-left{ grid-column:1; grid-row:2; }
+  .dpad-right{ grid-column:3; grid-row:2; }
+  .dpad-down{ grid-column:2; grid-row:3; }
+
+  #shoot-zone{
+    position:absolute; right:0; top:0; bottom:0; width:52%;
+    pointer-events:auto; touch-action:none;
+  }
+  #shoot-hint{
+    position:absolute; right:18px; bottom:150px; color:rgba(233,237,242,.55);
+    font-size:11.5px; text-align:right; max-width:150px; line-height:1.5;
+    pointer-events:none;
+  }
+  #shoot-btn{
+    position:fixed; right:19vw; bottom:69px;
+    width:64px; height:64px; z-index:17;
+    background:rgba(229,72,77,.28); border:2px solid #e5484d;
+    color:#ffb3b5; font-size:26px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; touch-action:none;
+    pointer-events:auto;
+  }
+  #shoot-btn.active{ background:rgba(229,72,77,.55); }
+
+  #exit-fullscreen-zone{
+    position:fixed; top:0; left:50%; transform:translateX(-50%);
+    width:170px; height:34px; z-index:30;
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08); border-top:none;
+    border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    color:rgba(255,255,255,.4); font-size:10.5px; letter-spacing:.05em;
+    cursor:pointer; -webkit-user-select:none; user-select:none;
+  }
+  #exit-fullscreen-zone.hidden{ display:none; }
+
+  /* end screen */
+  table.results{width:100%;border-collapse:collapse;margin:14px 0 6px;font-size:13px;}
+  table.results th,table.results td{
+    text-align:left;padding:8px 8px;border-bottom:1px solid #2b323c;vertical-align:top;
+  }
+  table.results th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+  .tag.ok{background:rgba(51,193,122,.15);color:var(--ok);}
+  .tag.bad{background:rgba(229,72,77,.15);color:var(--bad);}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0;}
+  .stat{background:#232a33;border-radius:8px;padding:12px 10px;text-align:center;}
+  .stat .n{font-size:22px;font-weight:800;}
+  .stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+  .stat.ok .n{color:var(--ok);}
+  .stat.bad .n{color:var(--bad);}
+  .stat.accent .n{color:var(--accent);}
+
+  #vr-btn-slot{margin-bottom:4px;}
+  #vr-btn-slot button{
+    position:static !important; width:100% !important; margin:0 !important;
+    padding:14px !important; border-radius:7px !important; font-size:15px !important;
+    font-weight:700 !important; letter-spacing:.02em;
+    background-color:#ff8c1a !important; border:1px solid #ff9a33 !important; color:#ffffff !important;
+  }
+  #vr-btn-slot button:hover{ background-color:#ffa03d !important; }
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<canvas id="app-canvas"></canvas>
+
+<div id="mobile-controls" class="hidden">
+  <div id="minimap-mobile" class="hidden"></div>
+  <div id="dpad">
+    <div class="dpad-btn dpad-up" data-dir="up">▲</div>
+    <div class="dpad-btn dpad-left" data-dir="left">◀</div>
+    <div class="dpad-btn dpad-right" data-dir="right">▶</div>
+    <div class="dpad-btn dpad-down" data-dir="down">▼</div>
+  </div>
+  <div id="shoot-zone">
+    <div id="shoot-hint">Desliza para mirar alrededor</div>
+  </div>
+  <div id="shoot-btn">🎯</div>
+</div>
+<div id="exit-fullscreen-zone" class="hidden">⤢ salir de pantalla completa</div>
+
+<!-- PANTALLA DE INICIO -->
+<div class="screen" id="overlay-start">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:flex-start;margin-bottom:0;flex-wrap:nowrap;gap:10px;">
+      <div style="min-width:0;">
+        <div class="eyebrow">IES Santa Engracia · STEAM 4.0 - SCS</div>
+        <h1>Laberinto <span>VR</span> de Preguntas :-)</h1>
+      </div>
+      <button class="btn ghost" id="btn-info" title="Cómo jugar y formato del fichero de preguntas"
+        style="flex-shrink:0;width:38px;height:38px;padding:0;border-radius:50%;font-weight:800;font-size:17px;">⚙️</button>
+    </div>
+    <div class="sub">Un laberinto estilo arcade en realidad virtual para repasar preguntas (por defecto, geografía e historia de 1º ESO). Responde a los guardianes que encuentres por el camino y cuidado con los enemigos.</div>
+
+    <div id="info-panel" class="hidden" style="background:#1a2338;border:1px solid #2c3a52;border-radius:9px;padding:16px 18px;margin-bottom:16px;">
+      <ul class="instructions" style="margin-bottom:16px;">
+        <li><b>Movimiento (VR):</b> joystick del mando izquierdo para desplazarte, joystick del mando derecho para girar.</li>
+        <li><b>Disparo / seleccionar respuesta (VR):</b> gatillo del mando.</li>
+        <li><b>Movimiento (móvil):</b> cruz táctil abajo a la izquierda para caminar; desliza el dedo a la derecha para mirar alrededor; botón 🎯 para disparar.</li>
+        <li><b>Enemigos:</b> dispárales para ganar 1 punto extra y suelta una moneda. Si te tocan, pierdes 1 punto.</li>
+        <li><b>Preguntas:</b> acércate a un guardián y responde tocando una de las 4 opciones.</li>
+      </ul>
+      <div class="divider"></div>
+      <div class="eyebrow" style="margin-bottom:8px;">Formato del fichero de preguntas (.txt)</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px;">
+        Una pregunta por línea, con la pregunta y las 4 opciones separadas por punto y coma (<code>;</code>).
+        Marca la respuesta correcta poniendo un asterisco (<code>*</code>) justo después del punto y coma que la precede, sin espacio.
+      </div>
+      <div style="background:#10151f;border:1px solid #2c333d;border-radius:7px;padding:10px 12px;font-family:monospace;font-size:12px;color:#dbe2ea;overflow-x:auto;white-space:pre;">pregunta;opción1;opción2;opción3;opción4
+¿Cuál es la capital de Francia?;a) Madrid;*b) París;c) Londres;d) Roma</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Puedes incluir tantas líneas/preguntas como quieras; se colocará un guardián por cada una.</div>
+
+      <div class="divider"></div>
+      <div class="eyebrow" style="margin-bottom:8px;">Tamaño del laberinto</div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="btn secondary" id="maze-size-dec" style="padding:8px 16px;font-size:18px;line-height:1;">−</button>
+        <div id="maze-size-label" style="min-width:80px;text-align:center;font-weight:700;color:var(--accent);">7×7</div>
+        <button class="btn secondary" id="maze-size-inc" style="padding:8px 16px;font-size:18px;line-height:1;">+</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">El minimapa se muestra siempre con el mismo tamaño en pantalla, solo cambia el detalle.</div>
+
+      <div class="divider"></div>
+      <div class="eyebrow" style="margin-bottom:8px;">Cantidad de enemigos en el laberinto</div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="btn secondary" id="robot-dec" style="padding:8px 16px;font-size:18px;line-height:1;">−</button>
+        <div id="robot-level-label" style="min-width:80px;text-align:center;font-weight:700;color:var(--accent);">Normal</div>
+        <button class="btn secondary" id="robot-inc" style="padding:8px 16px;font-size:18px;line-height:1;">+</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">No depende del número de preguntas; ajusta cuántos enemigos como máximo puede haber a la vez (el máximo escala con el tamaño del laberinto).</div>
+    </div>
+
+    <div class="row" style="display:block;">
+      <label for="player-name" style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Tu nombre *</label>
+      <input type="text" id="player-name" placeholder="Escribe tu nombre" maxlength="24"
+        style="width:100%;padding:12px 14px;border-radius:7px;border:1px solid #394252;background:#232a33;color:var(--text);font-size:14.5px;" />
+    </div>
+
+    <div class="row" style="display:block;">
+      <label for="env-select" style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Entorno</label>
+      <select id="env-select"
+        style="width:100%;padding:12px 14px;border-radius:7px;border:1px solid #394252;background:#232a33;color:var(--text);font-size:14.5px;">
+        <option value="castillo" selected>🏰 Castillo</option>
+        <option value="jardin">🌳 Jardín</option>
+        <option value="biblioteca">📚 Biblioteca</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label class="file-label" for="file-input">
+        📄 Cargar preguntas (.txt) — opcional
+      </label>
+      <input type="file" id="file-input" accept=".txt" class="hidden" />
+      <span id="file-name">Usando 20 preguntas por defecto</span>
+    </div>
+    <div class="row">
+      <label class="file-label" for="music-input">
+        🎵 Cargar música de fondo — opcional
+      </label>
+      <input type="file" id="music-input" accept="audio/*" class="hidden" />
+      <span id="music-name">Música ambiental generada por defecto</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="vr-btn-slot"></div>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn secondary" id="btn-desktop" style="flex:1;background:#681742;">🖥️ Jugar en modo escritorio</button>
+      <button class="btn secondary" id="btn-mobile" style="flex:1;background:#0E3E36;">📱 Jugar en modo móvil</button>
+    </div>
+    <div class="status" id="start-status"></div>
+  </div>
+</div>
+
+<!-- PANTALLA FINAL -->
+<div class="screen hidden" id="overlay-end">
+  <div class="card">
+    <div class="eyebrow">Resultados</div>
+    <h1>Fin de la <span>partida</span></h1>
+    <div class="sub">Jugador: <b id="result-player-name" style="color:var(--accent);"></b></div>
+
+    <div class="stat-grid">
+      <div class="stat ok"><div class="n" id="stat-correct">0</div><div class="l">Aciertos</div></div>
+      <div class="stat bad"><div class="n" id="stat-wrong">0</div><div class="l">Fallos</div></div>
+      <div class="stat accent"><div class="n" id="stat-kills">0</div><div class="l">Enemigos abatidos</div></div>
+      <div class="stat bad"><div class="n" id="stat-hits">0</div><div class="l">Golpes recibidos</div></div>
+    </div>
+    <div class="row" style="justify-content:center;gap:10px;">
+      <div class="stat" style="min-width:160px;">
+        <div class="n" id="stat-total" style="color:var(--accent2);">0</div>
+        <div class="l">Puntuación final</div>
+      </div>
+      <div class="stat" style="min-width:160px;">
+        <div class="n" id="stat-time" style="color:var(--accent2);">0:00</div>
+        <div class="l">Tiempo total</div>
+      </div>
+    </div>
+
+    <table class="results" id="results-table">
+      <thead><tr><th style="width:6%;">#</th><th>Pregunta</th><th>Tu respuesta</th><th style="width:10%;">Resultado</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="divider"></div>
+    <div class="row">
+      <button class="btn" id="btn-share" style="flex:1;">📤 Compartir resultados</button>
+      <button class="btn secondary" id="btn-restart" style="flex:1;">🔁 Volver a jugar</button>
+    </div>
+    <div class="status" id="share-status"></div>
+  </div>
+</div>
+
+<div class="hidden" id="hint">Acércate a un guardián para responder · dispara a los enemigos</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+/* =========================================================
+   PREGUNTAS POR DEFECTO — GEOGRAFÍA E HISTORIA (1º ESO, nivel fácil)
+   Formato: pregunta;opcion1;opcion2;opcion3;opcion4
+   El asterisco justo tras el ";" marca la opción correcta.
+========================================================= */
+const DEFAULT_QUESTIONS_TXT = `
+¿Cuál es la capital de España?;a) Barcelona;*b) Madrid;c) Sevilla;d) Valencia
+¿En qué continente está España?;a) África;b) Asia;*c) Europa;d) América
+¿Cuál es el océano más grande del planeta?;a) Atlántico;b) Índico;*c) Pacífico;d) Ártico
+¿Qué mar baña la costa este de España?;a) Mar Cantábrico;*b) Mar Mediterráneo;c) Mar del Norte;d) Mar Rojo
+¿Cuál de estos ríos pasa por Sevilla?;*a) Guadalquivir;b) Ebro;c) Duero;d) Miño
+¿Qué cordillera separa España de Francia?;a) Sierra Nevada;b) Sistema Central;c) Picos de Europa;*d) Pirineos
+¿Cuál es la montaña más alta de España?;a) Aneto;b) Mulhacén;*c) Teide;d) Almanzor
+¿Cuántas comunidades autónomas tiene España?;a) 10;b) 12;*c) 17;d) 25
+¿Cuál es el continente más grande?;a) África;*b) Asia;c) Europa;d) Oceanía
+¿Cuál es la capital de Francia?;a) Londres;b) Roma;c) Berlín;*d) París
+¿Qué pueblo construyó las pirámides de Egipto?;*a) Los egipcios;b) Los romanos;c) Los griegos;d) Los vikingos
+¿Cómo se llama la época anterior a la invención de la escritura?;a) Edad Media;*b) Prehistoria;c) Edad Moderna;d) Edad Contemporánea
+¿En qué año llegó Colón a América?;a) 1292;b) 1392;*c) 1492;d) 1592
+¿Qué pueblo construyó el Coliseo de Roma?;a) Los egipcios;*b) Los romanos;c) Los fenicios;d) Los aztecas
+¿Cuál es la capital de Italia?;a) Milán;b) Venecia;*c) Roma;d) Nápoles
+¿En qué país nacieron los Juegos Olímpicos antiguos?;a) Egipto;b) Italia;*c) Grecia;d) España
+¿Cuál es el desierto cálido más grande del mundo?;a) Gobi;*b) Sahara;c) Atacama;d) Kalahari
+¿Qué línea imaginaria divide la Tierra en hemisferio norte y hemisferio sur?;a) Meridiano de Greenwich;*b) Ecuador;c) Trópico de Cáncer;d) Círculo Polar Ártico
+¿Cuál es el satélite natural de la Tierra?;a) Marte;b) El Sol;*c) La Luna;d) Venus
+¿Cuál es la capital de Portugal?;a) Oporto;b) Faro;c) Madrid;*d) Lisboa
+`.trim();
+
+function parseQuestions(txt){
+  const lines = txt.split('\n').map(l=>l.trim()).filter(l=>l.length>0 && !l.startsWith('#'));
+  const out = [];
+  for(const line of lines){
+    const parts = line.split(';').map(p=>p.trim());
+    if(parts.length < 5) continue;
+    const question = parts[0];
+    const options = [];
+    for(let i=1;i<parts.length;i++){
+      let opt = parts[i];
+      let correct = false;
+      if(opt.startsWith('*')){ correct = true; opt = opt.slice(1).trim(); }
+      if(opt.length) options.push({text:opt, correct});
+    }
+    if(options.length >= 2 && options.some(o=>o.correct)){
+      out.push({question, options});
+    }
+  }
+  return out;
+}
+
+let QUESTIONS = parseQuestions(DEFAULT_QUESTIONS_TXT);
+
+/* ---------- carga de fichero de texto personalizado ---------- */
+const fileInput = document.getElementById('file-input');
+const fileNameEl = document.getElementById('file-name');
+const startStatus = document.getElementById('start-status');
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const parsed = parseQuestions(reader.result);
+    if(parsed.length >= 3){
+      QUESTIONS = parsed;
+      fileNameEl.textContent = `${file.name} · ${parsed.length} preguntas cargadas`;
+      startStatus.textContent = '';
+    } else {
+      startStatus.textContent = 'El fichero no tiene un formato válido (pregunta;op1;*op2;op3;op4). Se mantienen las preguntas por defecto.';
+      startStatus.classList.add('warn');
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+/* =========================================================
+   ESCENA THREE.JS
+========================================================= */
+const canvas = document.getElementById('app-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.shadowMap.enabled = false;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x232833);
+scene.fog = new THREE.Fog(0x232833, 8, 30);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 100);
+camera.position.y = 0.35; // punto de vista un poco más elevado
+const dolly = new THREE.Group();
+dolly.add(camera);
+scene.add(dolly);
+
+/* ---------- ciclo día/noche del cielo (muy lento) ---------- */
+const SKY_CYCLE_SECONDS = 300; // 5 minutos por ciclo completo
+const SKY_LIGHT = {
+  bg: new THREE.Color(0x3a4152), hemiSky: new THREE.Color(0xdcebfa),
+  hemiGround: new THREE.Color(0x4c5460), hemiIntensity: 1.25,
+  dirColor: new THREE.Color(0xfff6e2), dirIntensity: 1.0,
+};
+const SKY_DARK = {
+  bg: new THREE.Color(0x181c24), hemiSky: new THREE.Color(0x3a4356),
+  hemiGround: new THREE.Color(0x20242c), hemiIntensity: 0.5,
+  dirColor: new THREE.Color(0x93a3c4), dirIntensity: 0.32,
+};
+let skyTime = 0;
+function updateSkyCycle(delta){
+  skyTime += delta;
+  const t = (Math.sin((skyTime/SKY_CYCLE_SECONDS)*Math.PI*2)+1)/2; // 0=noche, 1=día
+  scene.background.copy(SKY_DARK.bg).lerp(SKY_LIGHT.bg, t);
+  if(scene.fog) scene.fog.color.copy(scene.background);
+  hemiLight.color.copy(SKY_DARK.hemiSky).lerp(SKY_LIGHT.hemiSky, t);
+  hemiLight.groundColor.copy(SKY_DARK.hemiGround).lerp(SKY_LIGHT.hemiGround, t);
+  hemiLight.intensity = THREE.MathUtils.lerp(SKY_DARK.hemiIntensity, SKY_LIGHT.hemiIntensity, t);
+  dirLight.color.copy(SKY_DARK.dirColor).lerp(SKY_LIGHT.dirColor, t);
+  dirLight.intensity = THREE.MathUtils.lerp(SKY_DARK.dirIntensity, SKY_LIGHT.dirIntensity, t);
+}
+
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* Luces */
+const hemiLight = new THREE.HemisphereLight(0xcfe0f5, 0x3a4048, 1.0);
+scene.add(hemiLight);
+const dirLight = new THREE.DirectionalLight(0xfff2d8, 0.85);
+dirLight.position.set(3,6,2);
+scene.add(dirLight);
+
+/* =========================================================
+   TEXTURAS PROCEDURALES (sin dependencias externas)
+========================================================= */
+function makeCanvasTexture(draw, w=256, h=256){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d');
+  draw(ctx,w,h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* =========================================================
+   ENTORNOS (Castillo / Jardín / Biblioteca)
+========================================================= */
+let currentTheme = 'castillo';
+
+// ---------- Castillo (piedra) ----------
+const castilloWallTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#828d99'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = 'rgba(25,28,33,.3)'; ctx.lineWidth=3;
+  const rows=6, cols=4;
+  for(let r=0;r<rows;r++){
+    const y = r*(h/rows);
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+    const offset = (r%2===0)?0:(w/cols/2);
+    for(let c2=0;c2<=cols;c2++){
+      const x = c2*(w/cols)+offset;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+(h/rows)); ctx.stroke();
+    }
+  }
+  ctx.fillStyle='rgba(255,140,26,.05)';
+  for(let i=0;i<40;i++){
+    ctx.fillRect(Math.random()*w, Math.random()*h, 2,2);
+  }
+});
+const castilloFloorTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#7c8ba0'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = 'rgba(35,48,68,.35)'; ctx.lineWidth=2;
+  const step = w/8;
+  for(let i=0;i<=8;i++){
+    ctx.beginPath(); ctx.moveTo(i*step,0); ctx.lineTo(i*step,h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*step); ctx.lineTo(w,i*step); ctx.stroke();
+  }
+});
+
+// ---------- Jardín (setos + hierba + cielo) ----------
+const jardinWallTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#2f5c2a'; ctx.fillRect(0,0,w,h);
+  for(let i=0;i<450;i++){
+    const x = Math.random()*w, y = Math.random()*h;
+    const r = 3 + Math.random()*4;
+    const s = Math.random()*45;
+    ctx.fillStyle = `rgba(${52+s*0.3},${104+s},${48+s*0.3},.9)`;
+    ctx.beginPath();
+    ctx.ellipse(x,y,r,r*0.6, Math.random()*Math.PI, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.strokeStyle='rgba(18,32,14,.35)'; ctx.lineWidth=1;
+  for(let i=0;i<40;i++){
+    const x=Math.random()*w,y=Math.random()*h;
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+(Math.random()-0.5)*14, y+(Math.random()-0.5)*14); ctx.stroke();
+  }
+});
+const jardinFloorTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#8fc45c'; ctx.fillRect(0,0,w,h);
+  for(let i=0;i<650;i++){
+    const x=Math.random()*w, y=Math.random()*h;
+    const s = Math.random()*30;
+    ctx.strokeStyle = `rgba(${112-s},${172+s*0.4},${72-s*0.3},.85)`;
+    ctx.lineWidth=1.3;
+    const len = 4+Math.random()*5;
+    const ang = -Math.PI/2 + (Math.random()-0.5)*0.9;
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+    ctx.lineTo(x+Math.cos(ang)*len, y+Math.sin(ang)*len);
+    ctx.stroke();
+  }
+});
+const jardinSkyTexture = makeCanvasTexture((ctx,w,h)=>{
+  const grad = ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,'#bfe3ff');
+  grad.addColorStop(1,'#eaf7ff');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  for(let i=0;i<11;i++){
+    const cx = Math.random()*w, cy = Math.random()*h;
+    const scale = 14+Math.random()*18;
+    for(let k=0;k<5;k++){
+      const ox = (Math.random()-0.5)*scale*2;
+      const oy = (Math.random()-0.5)*scale*0.6;
+      ctx.beginPath();
+      ctx.ellipse(cx+ox, cy+oy, scale*(0.5+Math.random()*0.5), scale*0.4, 0,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+});
+
+// ---------- Biblioteca (estanterías + suelo naranja + escayola) ----------
+const bibliotecaWallTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#5b3a22'; ctx.fillRect(0,0,w,h);
+  const rows = 5, rowH = h/rows;
+  const bookColors = ['#8a2c2c','#2c4f8a','#2c8a4f','#8a7a2c','#5c2c8a','#8a5a2c','#2c8a86'];
+  for(let r=0;r<rows;r++){
+    const y0 = r*rowH;
+    let x = 2;
+    while(x < w-4){
+      const bw = 6+Math.random()*10;
+      const bh = rowH*(0.6+Math.random()*0.35);
+      ctx.fillStyle = bookColors[Math.floor(Math.random()*bookColors.length)];
+      ctx.fillRect(x, y0+rowH-6-bh, bw, bh);
+      x += bw+1;
+    }
+    ctx.fillStyle = '#3a2313';
+    ctx.fillRect(0, y0+rowH-6, w, 6);
+  }
+});
+const bibliotecaFloorTexture = makeCanvasTexture((ctx,w,h)=>{
+  ctx.fillStyle = '#c9701f'; ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle = 'rgba(90,45,10,.4)'; ctx.lineWidth=2;
+  const step = w/8;
+  for(let i=0;i<=8;i++){
+    ctx.beginPath(); ctx.moveTo(i*step,0); ctx.lineTo(i*step,h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*step); ctx.lineTo(w,i*step); ctx.stroke();
+  }
+});
+
+[castilloWallTexture, castilloFloorTexture, jardinWallTexture, jardinFloorTexture, bibliotecaWallTexture, bibliotecaFloorTexture]
+  .forEach(t=>{ t.wrapS = t.wrapT = THREE.RepeatWrapping; });
+
+const THEMES = {
+  castillo: {
+    label:'Castillo', wallTexture:castilloWallTexture, floorTexture:castilloFloorTexture,
+    ceilingType:'flat', ceilingColor:0x545b66, torchColor:0xffc98a,
+    enemyBuilder: ()=>makeMummyMesh(),
+  },
+  jardin: {
+    label:'Jardín', wallTexture:jardinWallTexture, floorTexture:jardinFloorTexture,
+    ceilingType:'sky', skyTexture:jardinSkyTexture, torchColor:0xfff2c2,
+    enemyBuilder: ()=>makeBearMesh(),
+  },
+  biblioteca: {
+    label:'Biblioteca', wallTexture:bibliotecaWallTexture, floorTexture:bibliotecaFloorTexture,
+    ceilingType:'flat', ceilingColor:0xd7d3cc, torchColor:0xffe6b3,
+    enemyBuilder: ()=>makeGhostMesh(),
+  },
+};
+
+/* =========================================================
+   GENERACIÓN DEL LABERINTO (recursive backtracker)
+========================================================= */
+const CELL_SIZE = 4;
+const WALL_HEIGHT = 3.0;
+let MAZE_W = 7, MAZE_H = 7;   // celdas (seleccionable)
+let GW = MAZE_W*2+1, GH = MAZE_H*2+1; // tamaño de la rejilla resultante
+
+function generateMazeCells(w,h){
+  const idx=(x,y)=>y*w+x;
+  const cells = new Array(w*h).fill(0).map(()=>({N:true,S:true,E:true,W:true,visited:false}));
+  const stack=[[0,0]];
+  cells[idx(0,0)].visited = true;
+  const opposite = {N:'S',S:'N',E:'W',W:'E'};
+  while(stack.length){
+    const [x,y] = stack[stack.length-1];
+    const options=[];
+    if(y>0 && !cells[idx(x,y-1)].visited) options.push(['N',x,y-1]);
+    if(y<h-1 && !cells[idx(x,y+1)].visited) options.push(['S',x,y+1]);
+    if(x>0 && !cells[idx(x-1,y)].visited) options.push(['W',x-1,y]);
+    if(x<w-1 && !cells[idx(x+1,y)].visited) options.push(['E',x+1,y]);
+    if(options.length===0){ stack.pop(); continue; }
+    const [dir,nx,ny] = options[Math.floor(Math.random()*options.length)];
+    cells[idx(x,y)][dir] = false;
+    cells[idx(nx,ny)][opposite[dir]] = false;
+    cells[idx(nx,ny)].visited = true;
+    stack.push([nx,ny]);
+  }
+  return cells;
+}
+
+function cellsToGrid(cells,w,h){
+  const grid = Array.from({length:GH}, ()=> new Array(GW).fill('#'));
+  const idx=(x,y)=>y*w+x;
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const c = cells[idx(x,y)];
+      const gx=2*x+1, gy=2*y+1;
+      grid[gy][gx] = '.';
+      if(!c.N) grid[gy-1][gx]='.';
+      if(!c.S) grid[gy+1][gx]='.';
+      if(!c.W) grid[gy][gx-1]='.';
+      if(!c.E) grid[gy][gx+1]='.';
+    }
+  }
+  return grid;
+}
+
+function gridToWorld(gx,gy){
+  return { x:(gx-(GW-1)/2)*CELL_SIZE, z:(gy-(GH-1)/2)*CELL_SIZE };
+}
+function worldToGridApprox(x,z){
+  return { gx: Math.round(x/CELL_SIZE + (GW-1)/2), gy: Math.round(z/CELL_SIZE + (GH-1)/2) };
+}
+
+let grid = null;
+let mazeGroup = new THREE.Group();
+scene.add(mazeGroup);
+
+function isFree(x,z,radius){
+  const {gx,gy} = worldToGridApprox(x,z);
+  for(let oy=-1;oy<=1;oy++){
+    for(let ox=-1;ox<=1;ox++){
+      const cx=gx+ox, cy=gy+oy;
+      if(cx<0||cy<0||cx>=GW||cy>=GH) continue;
+      if(grid[cy][cx] !== '#') continue;
+      const w = gridToWorld(cx,cy);
+      const half = CELL_SIZE/2;
+      const closestX = Math.max(w.x-half, Math.min(x, w.x+half));
+      const closestZ = Math.max(w.z-half, Math.min(z, w.z+half));
+      const dx=x-closestX, dz=z-closestZ;
+      if(dx*dx+dz*dz < radius*radius) return false;
+    }
+  }
+  return true;
+}
+function tryMove(pos, dx, dz, radius){
+  if(isFree(pos.x+dx, pos.z, radius)) pos.x += dx;
+  if(isFree(pos.x, pos.z+dz, radius)) pos.z += dz;
+}
+function shuffleArray(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function buildMazeMeshes(){
+  while(mazeGroup.children.length) mazeGroup.remove(mazeGroup.children[0]);
+  const theme = THEMES[currentTheme] || THEMES.castillo;
+
+  const wallMat = new THREE.MeshStandardMaterial({ map:theme.wallTexture, roughness:.9, metalness:.05 });
+  const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+  for(let gy=0; gy<GH; gy++){
+    for(let gx=0; gx<GW; gx++){
+      if(grid[gy][gx] === '#'){
+        const w = gridToWorld(gx,gy);
+        const mesh = new THREE.Mesh(wallGeo, wallMat);
+        mesh.position.set(w.x, WALL_HEIGHT/2, w.z);
+        mazeGroup.add(mesh);
+      }
+    }
+  }
+  const floorMat = new THREE.MeshStandardMaterial({ map:theme.floorTexture, roughness:1 });
+  const floorSize = GW*CELL_SIZE;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMat);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = 0;
+  mazeGroup.add(floor);
+
+  const ceilMat = theme.ceilingType === 'sky'
+    ? new THREE.MeshBasicMaterial({ map: theme.skyTexture })
+    : new THREE.MeshStandardMaterial({ color: theme.ceilingColor, roughness:1 });
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), ceilMat);
+  ceil.rotation.x = Math.PI/2;
+  ceil.position.y = WALL_HEIGHT;
+  mazeGroup.add(ceil);
+
+  // luces ambiente puntuales tipo antorcha, repartidas (escala con el tamaño del laberinto)
+  const torchCount = Math.min(24, Math.max(8, Math.round((GW*GH)/20)));
+  for(let i=0;i<torchCount;i++){
+    const gx = 1 + Math.floor(Math.random()*(GW-2));
+    const gy = 1 + Math.floor(Math.random()*(GH-2));
+    if(grid[gy][gx] !== '.') continue;
+    const p = gridToWorld(gx,gy);
+    const pl = new THREE.PointLight(theme.torchColor, 1.1, 7.5, 2);
+    pl.position.set(p.x, 1.8, p.z);
+    mazeGroup.add(pl);
+  }
+}
+
+function openCellList(){
+  const cells = [];
+  for(let x=0;x<MAZE_W;x++){
+    for(let y=0;y<MAZE_H;y++){
+      if(x===0 && y===0) continue; // reservada para el jugador
+      cells.push({gx:2*x+1, gy:2*y+1});
+    }
+  }
+  // shuffle
+  for(let i=cells.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [cells[i],cells[j]] = [cells[j],cells[i]];
+  }
+  return cells;
+}
+
+/* =========================================================
+   HUD Y MIRA (en la propia escena, visibles también en VR)
+========================================================= */
+const hudCanvas = document.createElement('canvas');
+hudCanvas.width = 512; hudCanvas.height = 128;
+const hudCtx = hudCanvas.getContext('2d');
+const hudTexture = new THREE.CanvasTexture(hudCanvas);
+function drawHUD(){
+  const ctx = hudCtx;
+  ctx.clearRect(0,0,512,128);
+  ctx.fillStyle = 'rgba(10,12,15,.55)';
+  ctx.fillRect(0,0,512,128);
+  ctx.fillStyle = '#ff8c1a';
+  ctx.font = 'bold 30px sans-serif';
+  ctx.fillText(`Puntos: ${state.score}`, 20, 44);
+  ctx.fillStyle = '#e9edf2';
+  ctx.font = '20px sans-serif';
+  ctx.fillText(`Preguntas: ${state.answers.length}/${QUESTIONS.length}`, 20, 78);
+  ctx.fillStyle = '#8b96a5';
+  ctx.font = '16px sans-serif';
+  ctx.fillText(`Enemigos: +${state.mummyKills}  Golpes: -${state.mummyHits}`, 20, 104);
+  hudTexture.needsUpdate = true;
+}
+const hudMat = new THREE.MeshBasicMaterial({ map:hudTexture, transparent:true, depthTest:false });
+const hudPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.5,0.125), hudMat);
+hudPlane.position.set(0,-0.32,-0.5);
+hudPlane.renderOrder = 999;
+camera.add(hudPlane);
+
+const crossMat = new THREE.MeshBasicMaterial({ color:0xffffff, depthTest:false, transparent:true, opacity:.85 });
+const crossGroup = new THREE.Group();
+const bar1 = new THREE.Mesh(new THREE.PlaneGeometry(0.012,0.0018), crossMat);
+const bar2 = new THREE.Mesh(new THREE.PlaneGeometry(0.0018,0.012), crossMat);
+crossGroup.add(bar1, bar2);
+crossGroup.position.set(0,0,-0.5);
+crossGroup.renderOrder = 999;
+camera.add(crossGroup);
+
+/* ---------- destello de daño (al chocar con un robot) ---------- */
+const flashMat = new THREE.MeshBasicMaterial({ color:0xff8c1a, transparent:true, opacity:0, depthTest:false, depthWrite:false, side:THREE.DoubleSide });
+const flashPlane = new THREE.Mesh(new THREE.PlaneGeometry(6,6), flashMat);
+flashPlane.position.set(0,0,-0.2);
+flashPlane.renderOrder = 1000;
+camera.add(flashPlane);
+let flashIntensity = 0;
+
+/* ---------- minimapa (esquina superior izquierda) ---------- */
+const minimapCanvas = document.createElement('canvas');
+minimapCanvas.width = 260; minimapCanvas.height = 260;
+const minimapCtx = minimapCanvas.getContext('2d');
+const minimapTexture = new THREE.CanvasTexture(minimapCanvas);
+const minimapMat = new THREE.MeshBasicMaterial({ map:minimapTexture, transparent:true, depthTest:false });
+const minimapPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.17,0.17), minimapMat);
+minimapPlane.position.set(-0.2, 0.12, -0.5);
+minimapPlane.renderOrder = 999;
+camera.add(minimapPlane);
+
+// en modo móvil el minimapa se muestra como overlay 2D encima de la cruz de movimiento
+const minimapMobileWrap = document.getElementById('minimap-mobile');
+minimapCanvas.style.width = '100%';
+minimapCanvas.style.height = '100%';
+minimapCanvas.style.display = 'block';
+minimapMobileWrap.appendChild(minimapCanvas);
+
+const visitedCells = new Set();
+function markVisited(gx,gy,radius=1){
+  for(let oy=-radius; oy<=radius; oy++){
+    for(let ox=-radius; ox<=radius; ox++){
+      const cx=gx+ox, cy=gy+oy;
+      if(cx>=0 && cy>=0 && cx<GW && cy<GH) visitedCells.add(cy*GW+cx);
+    }
+  }
+}
+
+function drawMinimap(playerPos, playerAngle){
+  if(!grid) return;
+  const ctx = minimapCtx;
+  const size = minimapCanvas.width;
+  const cell = size/GW;
+  ctx.clearRect(0,0,size,size);
+  ctx.fillStyle = 'rgba(15,18,22,.7)';
+  ctx.fillRect(0,0,size,size);
+
+  for(let gy=0; gy<GH; gy++){
+    for(let gx=0; gx<GW; gx++){
+      if(!visitedCells.has(gy*GW+gx)) continue;
+      const isWall = grid[gy][gx] === '#';
+      ctx.fillStyle = isWall ? '#5b6472' : '#dbe2ea';
+      ctx.fillRect(gx*cell, gy*cell, Math.ceil(cell), Math.ceil(cell));
+    }
+  }
+
+  npcs.forEach(npc=>{
+    const g = worldToGridApprox(npc.pos.x, npc.pos.z);
+    if(!visitedCells.has(g.gy*GW+g.gx)) return;
+    ctx.beginPath();
+    ctx.arc(g.gx*cell+cell/2, g.gy*cell+cell/2, cell*0.42, 0, Math.PI*2);
+    ctx.fillStyle = npc.answered ? '#33c17a' : '#3fa7ff';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth=1; ctx.stroke();
+  });
+
+  const pg = worldToGridApprox(playerPos.x, playerPos.z);
+  const px = pg.gx*cell+cell/2, py = pg.gy*cell+cell/2;
+  ctx.save();
+  ctx.translate(px,py);
+  ctx.rotate(playerAngle);
+  ctx.beginPath();
+  ctx.moveTo(0,-cell*0.7);
+  ctx.lineTo(cell*0.45, cell*0.55);
+  ctx.lineTo(-cell*0.45, cell*0.55);
+  ctx.closePath();
+  ctx.fillStyle = '#ff8c1a';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = '#ff8c1a';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(2,2,size-4,size-4);
+  minimapTexture.needsUpdate = true;
+}
+
+/* =========================================================
+   ESTADO DEL JUEGO
+========================================================= */
+const state = {
+  score: 0,
+  correct: 0,
+  wrong: 0,
+  mummyKills: 0,
+  mummyHits: 0,
+  answers: [],
+  running: false,
+};
+let playerName = 'Jugador';
+let gameStartTime = 0;
+let elapsedSeconds = 0;
+
+const PLAYER_RADIUS = 0.45;
+const NPC_TRIGGER_RADIUS = 2.6;
+
+let npcs = [];        // {mesh, cellPos, question, answered, group}
+let mummies = [];     // {mesh, pos:Vector3, alive, respawnAt}
+let mummySpawnPoints = [];
+let activePanel = null;
+let panelAnswering = false;
+let playerInvuln = 0;
+
+/* ---------- personaje "guardián" (NPC) ---------- */
+function makeGuardianMesh(){
+  const g = new THREE.Group();
+  const bodyMat = new THREE.MeshStandardMaterial({ color:0x3fa7ff, emissive:0x0a2233, roughness:.4, metalness:.3 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,1.15,10), bodyMat);
+  body.position.y = 0.75;
+  const headMat = new THREE.MeshStandardMaterial({ color:0xffe08a, emissive:0x332600, roughness:.5 });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26,14,14), headMat);
+  head.position.y = 1.55;
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.08,0.06), new THREE.MeshBasicMaterial({color:0xff8c1a}));
+  visor.position.set(0,1.55,0.24);
+  g.add(body, head, visor);
+  const light = new THREE.PointLight(0x3fa7ff, 0.8, 3.5, 2);
+  light.position.y = 1.4;
+  g.add(light);
+  return g;
+}
+
+/* ---------- robot ---------- */
+function makeMummyMesh(){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:0x8a94a3, roughness:.45, metalness:.6 });
+  const trimMat = new THREE.MeshStandardMaterial({ color:0x5b6472, roughness:.4, metalness:.65 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3,0.75,4,8), mat);
+  body.position.y = 0.85;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24,10,10), trimMat);
+  head.position.y = 1.5;
+  const eyeMat = new THREE.MeshBasicMaterial({ color:0xff3b30 });
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6), eyeMat);
+  eyeL.position.set(-0.08,1.52,0.2);
+  const eyeR = eyeL.clone(); eyeR.position.x = 0.08;
+  g.add(body, head, eyeL, eyeR);
+  for(let i=0;i<3;i++){
+    const wrap = new THREE.Mesh(new THREE.TorusGeometry(0.31,0.03,6,12), trimMat);
+    wrap.rotation.x = Math.PI/2;
+    wrap.position.y = 0.5 + i*0.35;
+    g.add(wrap);
+  }
+  return g;
+}
+
+function makeBearMesh(){
+  const g = new THREE.Group();
+  const furMat = new THREE.MeshStandardMaterial({ color:0x6b4423, roughness:.95 });
+  const darkMat = new THREE.MeshStandardMaterial({ color:0x3d2612, roughness:.9 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34,0.5,4,8), furMat);
+  body.position.y = 0.72;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27,12,12), furMat);
+  head.position.set(0,1.42,0.04);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.13,10,10), darkMat);
+  snout.position.set(0,1.36,0.27);
+  snout.scale.set(1,0.7,0.9);
+  const earL = new THREE.Mesh(new THREE.SphereGeometry(0.075,8,8), furMat);
+  earL.position.set(-0.19,1.66,0.0);
+  const earR = earL.clone(); earR.position.x = 0.19;
+  const eyeMat = new THREE.MeshBasicMaterial({ color:0x1a1005 });
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.028,6,6), eyeMat);
+  eyeL.position.set(-0.09,1.45,0.26);
+  const eyeR = eyeL.clone(); eyeR.position.x = 0.09;
+  const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.035,6,6), eyeMat);
+  noseTip.position.set(0,1.34,0.36);
+  g.add(body, head, snout, earL, earR, eyeL, eyeR, noseTip);
+  return g;
+}
+
+function makeGhostMesh(){
+  const g = new THREE.Group();
+  const ghostMat = new THREE.MeshStandardMaterial({
+    color:0xf2f5fa, roughness:.6, transparent:true, opacity:.82,
+    emissive:0x24354a, emissiveIntensity:.2,
+  });
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32,16,16,0,Math.PI*2,0,Math.PI*0.62), ghostMat);
+  head.position.y = 1.32;
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(0.32,0.82,16,1,true), ghostMat);
+  skirt.position.y = 0.92;
+  const eyeMat = new THREE.MeshBasicMaterial({ color:0x18202b });
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,8), eyeMat);
+  eyeL.scale.set(1,1.4,1);
+  eyeL.position.set(-0.1,1.35,0.26);
+  const eyeR = eyeL.clone(); eyeR.position.x = 0.1;
+  g.add(head, skirt, eyeL, eyeR);
+  const light = new THREE.PointLight(0xbcd9ff, 0.5, 2.5, 2);
+  light.position.y = 1.15;
+  g.add(light);
+  return g;
+}
+
+function spawnNpcs(){
+  npcs.forEach(n=>mazeGroup.remove(n.group));
+  npcs = [];
+  const cells = openCellList();
+  const spawnReserve = ROBOT_TABLE[MAZE_W][robotLevelIndex].spawnPoints;
+  const nQuestions = Math.min(QUESTIONS.length, cells.length - spawnReserve);
+  for(let i=0;i<nQuestions;i++){
+    const cell = cells[i];
+    const w = gridToWorld(cell.gx, cell.gy);
+    const group = makeGuardianMesh();
+    group.position.set(w.x, 0, w.z);
+    mazeGroup.add(group);
+    npcs.push({ group, question: QUESTIONS[i], answered:false, pos:new THREE.Vector3(w.x,0,w.z) });
+  }
+  // puntos de aparición de robots: celdas abiertas restantes
+  mummySpawnPoints = cells.slice(nQuestions, nQuestions+spawnReserve).map(c=>gridToWorld(c.gx,c.gy));
+  if(mummySpawnPoints.length===0) mummySpawnPoints=[gridToWorld(GW-2,GH-2)];
+}
+
+function spawnMummy(){
+  const sp = mummySpawnPoints[Math.floor(Math.random()*mummySpawnPoints.length)];
+  const theme = THEMES[currentTheme] || THEMES.castillo;
+  const mesh = theme.enemyBuilder();
+  mesh.position.set(sp.x, 0, sp.z);
+  mazeGroup.add(mesh);
+  mummies.push({ mesh, pos:new THREE.Vector3(sp.x,0,sp.z), alive:true });
+}
+
+let mummySpawnTimer = 0;
+let MAX_MUMMIES = 4;
+const MUMMY_RADIUS = 0.38;
+const MUMMY_SPEED = 1.35;
+
+function updateMummies(delta, playerPos){
+  mummySpawnTimer -= delta;
+  if(state.running && mummies.filter(m=>m.alive).length < MAX_MUMMIES && mummySpawnTimer<=0){
+    spawnMummy();
+    mummySpawnTimer = 3.5 + Math.random()*3;
+  }
+  for(const m of mummies){
+    if(!m.alive) continue;
+    const dx = playerPos.x - m.pos.x, dz = playerPos.z - m.pos.z;
+    const dist = Math.hypot(dx,dz);
+    if(dist > 0.001){
+      const nx = dx/dist, nz = dz/dist;
+      tryMove(m.pos, nx*MUMMY_SPEED*delta, nz*MUMMY_SPEED*delta, MUMMY_RADIUS);
+    }
+    m.mesh.position.set(m.pos.x, 0, m.pos.z);
+    m.mesh.lookAt(playerPos.x, 0, playerPos.z);
+
+    if(dist < (MUMMY_RADIUS+PLAYER_RADIUS) && playerInvuln<=0){
+      state.mummyHits++;
+      state.score -= 1;
+      playerInvuln = 1.4;
+      flashIntensity = 1;
+      drawHUD();
+      respawnMummy(m);
+    }
+  }
+  if(playerInvuln>0) playerInvuln -= delta;
+}
+
+function respawnMummy(m){
+  const sp = mummySpawnPoints[Math.floor(Math.random()*mummySpawnPoints.length)];
+  m.pos.set(sp.x,0,sp.z);
+  m.mesh.position.copy(m.pos);
+}
+
+/* ---------- monedas (recompensa al abatir un robot) ---------- */
+let coins = [];
+const COIN_PICKUP_RADIUS = 0.55;
+
+function makeCoinMesh(){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:0xffd24a, emissive:0x5a3d00, metalness:.6, roughness:.3 });
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,0.045,20), mat);
+  disc.rotation.x = Math.PI/2;
+  g.add(disc);
+  const light = new THREE.PointLight(0xffd24a, 0.8, 2.2, 2);
+  light.position.y = 0.1;
+  g.add(light);
+  return g;
+}
+
+function spawnCoin(pos){
+  const mesh = makeCoinMesh();
+  mesh.position.set(pos.x, 0.55, pos.z);
+  mazeGroup.add(mesh);
+  coins.push({ mesh, pos: new THREE.Vector3(pos.x, 0.55, pos.z) });
+}
+
+function updateCoins(delta, playerPos){
+  for(let i=coins.length-1; i>=0; i--){
+    const c = coins[i];
+    c.mesh.rotation.y += delta*2.4;
+    c.mesh.position.y = c.pos.y + Math.sin(performance.now()/450 + i)*0.05;
+    const d = Math.hypot(playerPos.x-c.pos.x, playerPos.z-c.pos.z);
+    if(d < COIN_PICKUP_RADIUS){
+      mazeGroup.remove(c.mesh);
+      coins.splice(i,1);
+    }
+  }
+}
+
+function clearCoins(){
+  coins.forEach(c=> mazeGroup.remove(c.mesh));
+  coins = [];
+}
+
+function killMummy(mesh){
+  const m = mummies.find(mm=>mm.mesh===mesh || mm.mesh===mesh.parent);
+  if(!m || !m.alive) return;
+  state.mummyKills++;
+  state.score += 1;
+  drawHUD();
+  const deathPos = m.pos.clone();
+  respawnMummy(m);
+  spawnCoin(deathPos);
+  // pequeño efecto: desaparece un instante
+  m.mesh.visible = false;
+  setTimeout(()=>{ if(m.alive) m.mesh.visible = true; }, 600);
+}
+
+/* =========================================================
+   PANEL DE PREGUNTA (holograma en el mundo 3D)
+========================================================= */
+function wrapText(ctx, text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for(const w of words){
+    const test = cur ? cur+' '+w : w;
+    if(ctx.measureText(test).width > maxWidth && cur){ lines.push(cur); cur=w; }
+    else cur = test;
+  }
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+function makeLabelTexture(text, opts={}){
+  const w = opts.w||512, h = opts.h||160;
+  return makeCanvasTexture((ctx)=>{
+    ctx.fillStyle = opts.bg||'rgba(15,18,22,.92)';
+    ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = opts.border||'#ff8c1a';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3,3,w-6,h-6);
+    ctx.fillStyle = opts.color||'#e9edf2';
+    ctx.font = opts.font||'bold 30px sans-serif';
+    ctx.textBaseline = 'middle';
+    const lines = wrapText(ctx, text, w-40);
+    const lh = opts.lineHeight||36;
+    const startY = h/2 - (lines.length-1)*lh/2;
+    lines.forEach((l,i)=> ctx.fillText(l, 20, startY + i*lh));
+  }, w,h);
+}
+
+function openQuestionPanel(npc){
+  closeQuestionPanel();
+  const group = new THREE.Group();
+
+  const qTex = makeLabelTexture(npc.question.question, { w:820,h:260, font:'bold 38px sans-serif', border:'#3fa7ff', lineHeight:46 });
+  const qPlane = new THREE.Mesh(new THREE.PlaneGeometry(2.15,0.68), new THREE.MeshBasicMaterial({map:qTex, transparent:true, side:THREE.DoubleSide}));
+  qPlane.position.set(0,0.68,0);
+  group.add(qPlane);
+
+  const buttonMeshes = [];
+  const opts = shuffleArray(npc.question.options.slice());
+  const totalH = opts.length*0.46;
+  opts.forEach((opt,i)=>{
+    const tex = makeLabelTexture(opt.text, { w:740,h:150, font:'bold 34px sans-serif', border:'#555f6b', lineHeight:38 });
+    const mat = new THREE.MeshBasicMaterial({ map:tex, transparent:true, side:THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.9,0.38), mat);
+    mesh.position.set(0, 0.2 - i*0.46, 0);
+    mesh.userData = { npc, option:opt, isAnswerButton:true };
+    group.add(mesh);
+    buttonMeshes.push(mesh);
+  });
+
+  const npcPos = npc.pos;
+  const dirToPlayer = new THREE.Vector3().subVectors(dollyWorldPos(), npcPos).setY(0).normalize();
+  const panelPos = new THREE.Vector3(npcPos.x,1.55,npcPos.z).addScaledVector(dirToPlayer, 1.35);
+  group.position.copy(panelPos);
+  group.lookAt(dollyWorldPos().x, 1.55, dollyWorldPos().z);
+
+  mazeGroup.add(group);
+  activePanel = { group, buttonMeshes, npc };
+  document.getElementById('hint').classList.add('hidden');
+}
+
+function closeQuestionPanel(){
+  if(activePanel){
+    mazeGroup.remove(activePanel.group);
+    activePanel = null;
+  }
+}
+
+function dollyWorldPos(){
+  const p = new THREE.Vector3();
+  dolly.getWorldPosition(p);
+  return p;
+}
+
+function answerQuestion(npc, option){
+  if(!activePanel || panelAnswering) return;
+  panelAnswering = true;
+  const panel = activePanel;
+
+  npc.answered = true;
+  npc.group.traverse(o=>{
+    if(o.material && o.material.emissive){
+      o.material.color.set(0x33c17a);
+      o.material.emissive.set(0x0e3a24);
+    }
+    if(o.isPointLight) o.color.set(0x33c17a);
+  });
+  const correct = !!option.correct;
+  if(correct){ state.correct++; state.score += 1; }
+  else { state.wrong++; }
+  state.answers.push({ question: npc.question.question, chosen: option.text, correct });
+  drawHUD();
+
+  // feedback visual: verde para la opción correcta, rojo para las incorrectas
+  panel.buttonMeshes.forEach(mesh=>{
+    const isCorrectOpt = !!mesh.userData.option.correct;
+    const tex = makeLabelTexture(mesh.userData.option.text, {
+      w:740, h:150, font:'bold 34px sans-serif', lineHeight:38,
+      border: isCorrectOpt ? '#33c17a' : '#e5484d',
+      bg: isCorrectOpt ? 'rgba(18,58,38,.95)' : 'rgba(58,20,22,.95)',
+      color: '#ffffff',
+    });
+    mesh.material.map.dispose();
+    mesh.material.map = tex;
+    mesh.material.needsUpdate = true;
+  });
+
+  setTimeout(()=>{
+    closeQuestionPanel();
+    panelAnswering = false;
+    document.getElementById('hint').classList.remove('hidden');
+    if(state.answers.length >= npcs.length){
+      endGame();
+    }
+  }, 1300);
+}
+
+/* =========================================================
+   CONTROLADORES XR (movimiento por joystick + disparo)
+========================================================= */
+const controllerModelFactory = new XRControllerModelFactory();
+const raycaster = new THREE.Raycaster();
+const tmpMatrix = new THREE.Matrix4();
+
+function makeRayLine(){
+  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-5)]);
+  const mat = new THREE.LineBasicMaterial({ color:0xff8c1a, transparent:true, opacity:.6 });
+  const line = new THREE.Line(geo, mat);
+  line.scale.z = 1;
+  return line;
+}
+
+const controllers = [0,1].map(i=>{
+  const controller = renderer.xr.getController(i);
+  controller.userData.inputSource = null;
+  controller.addEventListener('connected', function(evt){ this.userData.inputSource = evt.data; });
+  controller.addEventListener('disconnected', function(){ this.userData.inputSource = null; });
+  controller.addEventListener('selectstart', onControllerSelect);
+  controller.add(makeRayLine());
+  dolly.add(controller);
+
+  const grip = renderer.xr.getControllerGrip(i);
+  grip.add(controllerModelFactory.createControllerModel(grip));
+  dolly.add(grip);
+
+  return controller;
+});
+
+function raycastFrom(object, targets){
+  tmpMatrix.identity().extractRotation(object.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(object.matrixWorld);
+  raycaster.ray.direction.set(0,0,-1).applyMatrix4(tmpMatrix);
+  return raycaster.intersectObjects(targets, true);
+}
+
+const MAX_TRACER_RANGE = 14;
+const TRACER_LIFETIME = 1.0; // segundos
+let activeTracers = [];
+function spawnTracer(origin, direction, distance){
+  const end = origin.clone().addScaledVector(direction, distance);
+  const geo = new THREE.BufferGeometry().setFromPoints([origin.clone(), end]);
+  const mat = new THREE.LineBasicMaterial({ color:0xffd27a, transparent:true, opacity:0.95 });
+  const line = new THREE.Line(geo, mat);
+  line.renderOrder = 998;
+  line.frustumCulled = false;
+  scene.add(line);
+  activeTracers.push({ line, mat, geo, life: TRACER_LIFETIME });
+}
+function updateTracers(delta){
+  for(let i=activeTracers.length-1; i>=0; i--){
+    const t = activeTracers[i];
+    t.life -= delta;
+    if(t.life <= 0){
+      scene.remove(t.line);
+      t.geo.dispose(); t.mat.dispose();
+      activeTracers.splice(i,1);
+    } else {
+      t.mat.opacity = Math.min(1, t.life/TRACER_LIFETIME) * 0.95;
+    }
+  }
+}
+
+function onControllerSelect(event){
+  const controller = event.target;
+  if(activePanel){
+    let hitDistance = MAX_TRACER_RANGE;
+    if(!panelAnswering){
+      const hits = raycastFrom(controller, activePanel.buttonMeshes);
+      if(hits.length){
+        hitDistance = hits[0].distance;
+        const ud = hits[0].object.userData;
+        answerQuestion(ud.npc, ud.option);
+      }
+    }
+    spawnTracer(raycaster.ray.origin, raycaster.ray.direction, hitDistance);
+    return;
+  }
+  const npcTargets = npcs.filter(n=>!n.answered).map(n=>n.group);
+  const npcHits = raycastFrom(controller, npcTargets);
+  if(npcHits.length){
+    let obj = npcHits[0].object;
+    while(obj.parent && !npcs.some(n=>n.group===obj)) obj = obj.parent;
+    const npc = npcs.find(n=>n.group===obj);
+    if(npc) openQuestionPanel(npc);
+    spawnTracer(raycaster.ray.origin, raycaster.ray.direction, npcHits[0].distance);
+    return;
+  }
+  const mummyMeshes = mummies.filter(m=>m.alive).map(m=>m.mesh);
+  const hits = raycastFrom(controller, mummyMeshes);
+  let hitDistance = MAX_TRACER_RANGE;
+  if(hits.length){
+    hitDistance = hits[0].distance;
+    let obj = hits[0].object;
+    while(obj.parent && !mummies.some(m=>m.mesh===obj)) obj = obj.parent;
+    killMummy(obj);
+  }
+  spawnTracer(raycaster.ray.origin, raycaster.ray.direction, hitDistance);
+}
+
+/* ---------- modo escritorio (previsualización sin gafas) ---------- */
+let desktopMode = false;
+const keys = {};
+let yaw = 0, pitch = 0;
+let pointerLocked = false;
+window.addEventListener('keydown', e=> keys[e.code]=true);
+window.addEventListener('keyup', e=> keys[e.code]=false);
+canvas.addEventListener('click', ()=>{
+  if(desktopMode && !renderer.xr.isPresenting){
+    canvas.requestPointerLock();
+    // disparo/selección con click también
+    doDesktopAction();
+  }
+});
+document.addEventListener('pointerlockchange', ()=>{
+  pointerLocked = document.pointerLockElement === canvas;
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!pointerLocked) return;
+  yaw -= e.movementX*0.0022;
+  pitch -= e.movementY*0.0022;
+  pitch = Math.max(-1.2, Math.min(1.2, pitch));
+});
+
+function doDesktopAction(){
+  raycaster.setFromCamera({x:0,y:0}, camera);
+  if(activePanel){
+    let hitDistance = MAX_TRACER_RANGE;
+    if(!panelAnswering){
+      const hits = raycaster.intersectObjects(activePanel.buttonMeshes, true);
+      if(hits.length){
+        hitDistance = hits[0].distance;
+        const ud = hits[0].object.userData;
+        answerQuestion(ud.npc, ud.option);
+      }
+    }
+    spawnTracer(raycaster.ray.origin, raycaster.ray.direction, hitDistance);
+    return;
+  }
+  const npcTargets = npcs.filter(n=>!n.answered).map(n=>n.group);
+  const npcHits = raycaster.intersectObjects(npcTargets, true);
+  if(npcHits.length){
+    let obj = npcHits[0].object;
+    while(obj.parent && !npcs.some(n=>n.group===obj)) obj = obj.parent;
+    const npc = npcs.find(n=>n.group===obj);
+    if(npc) openQuestionPanel(npc);
+    spawnTracer(raycaster.ray.origin, raycaster.ray.direction, npcHits[0].distance);
+    return;
+  }
+  const mummyMeshes = mummies.filter(m=>m.alive).map(m=>m.mesh);
+  const hits = raycaster.intersectObjects(mummyMeshes, true);
+  let hitDistance = MAX_TRACER_RANGE;
+  if(hits.length){
+    hitDistance = hits[0].distance;
+    let obj = hits[0].object;
+    while(obj.parent && !mummies.some(m=>m.mesh===obj)) obj = obj.parent;
+    killMummy(obj);
+  }
+  spawnTracer(raycaster.ray.origin, raycaster.ray.direction, hitDistance);
+}
+
+/* =========================================================
+   BUCLE PRINCIPAL
+========================================================= */
+const clock = new THREE.Clock();
+const UP = new THREE.Vector3(0,1,0);
+let minimapTimer = 0;
+
+function updateMovementXR(delta){
+  for(const controller of controllers){
+    const src = controller.userData.inputSource;
+    if(!src || !src.gamepad) continue;
+    const axes = src.gamepad.axes;
+    const ax = axes.length>=4 ? axes[2] : axes[0];
+    const ay = axes.length>=4 ? axes[3] : axes[1];
+    if(Math.abs(ax)<0.12 && Math.abs(ay)<0.12) continue;
+
+    if(src.handedness === 'left'){
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+      const right = dir.clone().applyAxisAngle(UP, -Math.PI/2);
+      const speed = 2.6*delta;
+      const dx = (right.x*ax + dir.x*(-ay))*speed;
+      const dz = (right.z*ax + dir.z*(-ay))*speed;
+      const p = { x:dolly.position.x, z:dolly.position.z };
+      tryMove(p, dx, dz, PLAYER_RADIUS);
+      dolly.position.x = p.x; dolly.position.z = p.z;
+    } else if(src.handedness === 'right'){
+      dolly.rotation.y -= ax * 1.6 * delta;
+    }
+  }
+}
+
+function updateMovementDesktop(delta){
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+  const right = dir.clone().applyAxisAngle(UP, -Math.PI/2);
+  let mx=0, mz=0;
+  const speed = 3.2*delta;
+  if(keys['KeyW']||keys['ArrowUp']){ mx+=dir.x*speed; mz+=dir.z*speed; }
+  if(keys['KeyS']||keys['ArrowDown']){ mx-=dir.x*speed; mz-=dir.z*speed; }
+  if(keys['KeyA']||keys['ArrowLeft']){ mx-=right.x*speed; mz-=right.z*speed; }
+  if(keys['KeyD']||keys['ArrowRight']){ mx+=right.x*speed; mz+=right.z*speed; }
+  const p = { x:dolly.position.x, z:dolly.position.z };
+  tryMove(p, mx, mz, PLAYER_RADIUS);
+  dolly.position.x = p.x; dolly.position.z = p.z;
+}
+
+/* ---------- modo móvil (cruz táctil para moverte, zona derecha para mirar/disparar) ---------- */
+let mobileMode = false;
+const mobileMove = { up:false, down:false, left:false, right:false };
+
+function updateMovementMobile(delta){
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+  const right = dir.clone().applyAxisAngle(UP, -Math.PI/2);
+  let mx=0, mz=0;
+  const speed = 2.7*delta;
+  if(mobileMove.up){ mx+=dir.x*speed; mz+=dir.z*speed; }
+  if(mobileMove.down){ mx-=dir.x*speed; mz-=dir.z*speed; }
+  if(mobileMove.left){ mx-=right.x*speed; mz-=right.z*speed; }
+  if(mobileMove.right){ mx+=right.x*speed; mz+=right.z*speed; }
+  if(mx || mz){
+    const p = { x:dolly.position.x, z:dolly.position.z };
+    tryMove(p, mx, mz, PLAYER_RADIUS);
+    dolly.position.x = p.x; dolly.position.z = p.z;
+  }
+}
+
+const mobileControlsEl = document.getElementById('mobile-controls');
+const shootZoneEl = document.getElementById('shoot-zone');
+
+document.querySelectorAll('.dpad-btn').forEach(btn=>{
+  const dir = btn.dataset.dir;
+  const start = (e)=>{ e.preventDefault(); mobileMove[dir] = true; btn.classList.add('active'); };
+  const end = (e)=>{ if(e) e.preventDefault(); mobileMove[dir] = false; btn.classList.remove('active'); };
+  btn.addEventListener('touchstart', start, { passive:false });
+  btn.addEventListener('touchend', end, { passive:false });
+  btn.addEventListener('touchcancel', end, { passive:false });
+  btn.addEventListener('mousedown', start);
+  window.addEventListener('mouseup', end);
+});
+
+let lookTouchId = null, lookLastX = 0, lookLastY = 0, lookStartTime = 0, lookMoved = false;
+camera.rotation.order = 'YXZ';
+
+shootZoneEl.addEventListener('touchstart', (e)=>{
+  if(!mobileMode) return;
+  const t = e.changedTouches[0];
+  lookTouchId = t.identifier;
+  lookLastX = t.clientX; lookLastY = t.clientY;
+  lookStartTime = performance.now();
+  lookMoved = false;
+  e.preventDefault();
+}, { passive:false });
+
+shootZoneEl.addEventListener('touchmove', (e)=>{
+  if(!mobileMode) return;
+  for(const t of e.changedTouches){
+    if(t.identifier !== lookTouchId) continue;
+    const dx = t.clientX - lookLastX;
+    const dy = t.clientY - lookLastY;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) lookMoved = true;
+    dolly.rotation.y -= dx * 0.0045;
+    camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x - dy*0.0032, -0.9, 0.9);
+    lookLastX = t.clientX; lookLastY = t.clientY;
+  }
+  e.preventDefault();
+}, { passive:false });
+
+shootZoneEl.addEventListener('touchend', (e)=>{
+  if(!mobileMode) return;
+  lookTouchId = null;
+  e.preventDefault();
+}, { passive:false });
+
+const shootBtnEl = document.getElementById('shoot-btn');
+const shootBtnStart = (e)=>{
+  if(!mobileMode) return;
+  e.preventDefault();
+  shootBtnEl.classList.add('active');
+  doDesktopAction();
+};
+const shootBtnEnd = (e)=>{
+  if(e) e.preventDefault();
+  shootBtnEl.classList.remove('active');
+};
+shootBtnEl.addEventListener('touchstart', shootBtnStart, { passive:false });
+shootBtnEl.addEventListener('touchend', shootBtnEnd, { passive:false });
+shootBtnEl.addEventListener('touchcancel', shootBtnEnd, { passive:false });
+shootBtnEl.addEventListener('mousedown', shootBtnStart);
+window.addEventListener('mouseup', shootBtnEnd);
+
+/* ---------- pantalla completa ---------- */
+function requestFullscreenSafe(){
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  if(req) req.call(el).catch(()=>{});
+}
+function exitFullscreenSafe(){
+  const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+  if(exit) exit.call(document).catch(()=>{});
+}
+const exitFsZone = document.getElementById('exit-fullscreen-zone');
+exitFsZone.addEventListener('click', exitFullscreenSafe);
+
+function updateFullscreenUI(){
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  exitFsZone.classList.toggle('hidden', !isFs);
+}
+document.addEventListener('fullscreenchange', updateFullscreenUI);
+document.addEventListener('webkitfullscreenchange', updateFullscreenUI);
+
+function checkNpcTriggers(){
+  if(activePanel) return;
+  const playerPos = dollyWorldPos();
+  for(const npc of npcs){
+    if(npc.answered) continue;
+    const d = Math.hypot(playerPos.x-npc.pos.x, playerPos.z-npc.pos.z);
+    if(d < NPC_TRIGGER_RADIUS){
+      openQuestionPanel(npc);
+      break;
+    }
+  }
+}
+
+function render(){
+  const delta = Math.min(clock.getDelta(), 0.1);
+  updateSkyCycle(delta);
+  if(state.running){
+    if(renderer.xr.isPresenting) updateMovementXR(delta);
+    else if(desktopMode) updateMovementDesktop(delta);
+    else if(mobileMode) updateMovementMobile(delta);
+    const playerPos = dollyWorldPos();
+    updateMummies(delta, playerPos);
+    updateCoins(delta, playerPos);
+    checkNpcTriggers();
+
+    const pg = worldToGridApprox(playerPos.x, playerPos.z);
+    markVisited(pg.gx, pg.gy, 1);
+    minimapTimer -= delta;
+    if(minimapTimer <= 0){
+      const dir = new THREE.Vector3();
+      camera.getWorldDirection(dir);
+      drawMinimap(playerPos, Math.atan2(dir.x, -dir.z));
+      minimapTimer = 0.15;
+    }
+  }
+  if(flashIntensity > 0){
+    flashIntensity = Math.max(0, flashIntensity - delta*1.8);
+    flashMat.opacity = flashIntensity * 0.38;
+  }
+  updateTracers(delta);
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(render);
+
+/* =========================================================
+   MÚSICA DE FONDO (melodía ambiental generada + carga opcional)
+========================================================= */
+let audioCtx = null;
+let musicGainNode = null;
+let customAudioBuffer = null;
+let usingCustomMusic = false;
+let customSourceNode = null;
+let ambientStopFn = null;
+
+document.getElementById('btn-info').addEventListener('click', ()=>{
+  document.getElementById('info-panel').classList.toggle('hidden');
+});
+
+/* ---------- tamaño del laberinto ---------- */
+const MAZE_SIZES = [5, 7, 10, 15];
+let mazeSizeIndex = 1; // 7x7 por defecto
+const mazeSizeLabel = document.getElementById('maze-size-label');
+function updateMazeSizeUI(){
+  const n = MAZE_SIZES[mazeSizeIndex];
+  mazeSizeLabel.textContent = `${n}×${n}`;
+  updateRobotLevelUI();
+}
+document.getElementById('maze-size-dec').addEventListener('click', ()=>{
+  mazeSizeIndex = Math.max(0, mazeSizeIndex - 1);
+  updateMazeSizeUI();
+});
+document.getElementById('maze-size-inc').addEventListener('click', ()=>{
+  mazeSizeIndex = Math.min(MAZE_SIZES.length - 1, mazeSizeIndex + 1);
+  updateMazeSizeUI();
+});
+
+/* ---------- nivel de robots (pocos / normal / muchos), según tamaño del laberinto ---------- */
+const ROBOT_LABELS = ['Pocos', 'Normal', 'Muchos'];
+const ROBOT_TABLE = {
+  5:  [ {max:2, spawnPoints:6},  {max:4,  spawnPoints:10}, {max:7,  spawnPoints:14} ],
+  7:  [ {max:2, spawnPoints:6},  {max:4,  spawnPoints:10}, {max:7,  spawnPoints:16} ],
+  10: [ {max:3, spawnPoints:10}, {max:6,  spawnPoints:16}, {max:10, spawnPoints:24} ],
+  15: [ {max:4, spawnPoints:14}, {max:10, spawnPoints:24}, {max:20, spawnPoints:40} ],
+};
+let robotLevelIndex = 1;
+const robotLevelLabel = document.getElementById('robot-level-label');
+function updateRobotLevelUI(){
+  robotLevelLabel.textContent = ROBOT_LABELS[robotLevelIndex];
+}
+document.getElementById('robot-dec').addEventListener('click', ()=>{
+  robotLevelIndex = Math.max(0, robotLevelIndex - 1);
+  updateRobotLevelUI();
+});
+document.getElementById('robot-inc').addEventListener('click', ()=>{
+  robotLevelIndex = Math.min(ROBOT_LABELS.length - 1, robotLevelIndex + 1);
+  updateRobotLevelUI();
+});
+
+const musicInput = document.getElementById('music-input');
+const musicNameEl = document.getElementById('music-name');
+musicInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  ensureAudioCtx();
+  file.arrayBuffer().then(buf=>{
+    audioCtx.decodeAudioData(buf, (decoded)=>{
+      customAudioBuffer = decoded;
+      usingCustomMusic = true;
+      musicNameEl.textContent = `${file.name} · pista cargada`;
+      if(state.running) startMusic();
+    }, ()=>{
+      musicNameEl.textContent = 'No se pudo leer ese archivo de audio.';
+    });
+  });
+});
+
+function ensureAudioCtx(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    musicGainNode = audioCtx.createGain();
+    musicGainNode.gain.value = 0.35;
+    musicGainNode.connect(audioCtx.destination);
+  }
+}
+
+function playGeneratedAmbient(ctx, out){
+  const chords = [
+    [220.00,261.63,329.63,392.00],
+    [174.61,220.00,261.63,349.23],
+    [130.81,164.81,196.00,261.63],
+    [196.00,246.94,293.66,392.00],
+  ];
+  let stopped = false;
+  let chordIndex = 0;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 1500;
+  filter.connect(out);
+  const activeGains = [];
+
+  function playChord(freqs, duration){
+    const chordGain = ctx.createGain();
+    chordGain.gain.value = 0;
+    chordGain.connect(filter);
+    const now = ctx.currentTime;
+    chordGain.gain.linearRampToValueAtTime(0.22, now+2.2);
+    chordGain.gain.linearRampToValueAtTime(0, now+duration-1.2);
+    freqs.forEach((f,i)=>{
+      const osc = ctx.createOscillator();
+      osc.type = i%2===0 ? 'sine' : 'triangle';
+      osc.frequency.value = f;
+      osc.detune.value = (Math.random()-0.5)*6;
+      osc.connect(chordGain);
+      osc.start(now);
+      osc.stop(now+duration+0.1);
+    });
+    activeGains.push(chordGain);
+  }
+  function scheduleNext(){
+    if(stopped) return;
+    const duration = 9;
+    playChord(chords[chordIndex % chords.length], duration);
+    chordIndex++;
+    setTimeout(scheduleNext, (duration-1.2)*1000);
+  }
+  scheduleNext();
+  return function stop(){
+    stopped = true;
+    activeGains.forEach(g=>{ try{ g.disconnect(); }catch(e){} });
+    try{ filter.disconnect(); }catch(e){}
+  };
+}
+
+function startMusic(){
+  ensureAudioCtx();
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  stopMusic();
+  if(usingCustomMusic && customAudioBuffer){
+    customSourceNode = audioCtx.createBufferSource();
+    customSourceNode.buffer = customAudioBuffer;
+    customSourceNode.loop = true;
+    customSourceNode.connect(musicGainNode);
+    customSourceNode.start();
+  } else {
+    ambientStopFn = playGeneratedAmbient(audioCtx, musicGainNode);
+  }
+}
+function stopMusic(){
+  if(customSourceNode){ try{ customSourceNode.stop(); }catch(e){} customSourceNode = null; }
+  if(ambientStopFn){ ambientStopFn(); ambientStopFn = null; }
+}
+
+/* =========================================================
+   FLUJO DE PARTIDA / PANTALLAS
+========================================================= */
+const overlayStart = document.getElementById('overlay-start');
+const overlayEnd = document.getElementById('overlay-end');
+const hintEl = document.getElementById('hint');
+
+function resetState(){
+  state.score=0; state.correct=0; state.wrong=0;
+  state.mummyKills=0; state.mummyHits=0; state.answers=[];
+  mummies.forEach(m=> mazeGroup.remove(m.mesh));
+  mummies = [];
+  mummySpawnTimer = 1;
+  playerInvuln = 0;
+  visitedCells.clear();
+  minimapTimer = 0;
+  clearCoins();
+  panelAnswering = false;
+  closeQuestionPanel();
+}
+
+function startGame(){
+  resetState();
+  const nameInput = document.getElementById('player-name');
+  playerName = (nameInput.value || '').trim() || 'Jugador';
+  currentTheme = document.getElementById('env-select').value || 'castillo';
+  gameStartTime = performance.now();
+  MAZE_W = MAZE_SIZES[mazeSizeIndex];
+  MAZE_H = MAZE_SIZES[mazeSizeIndex];
+  GW = MAZE_W*2+1;
+  GH = MAZE_H*2+1;
+  MAX_MUMMIES = ROBOT_TABLE[MAZE_W][robotLevelIndex].max;
+  grid = cellsToGrid(generateMazeCells(MAZE_W, MAZE_H), MAZE_W, MAZE_H);
+  buildMazeMeshes();
+  spawnNpcs();
+  const start = gridToWorld(1,1);
+  dolly.position.set(start.x, 0, start.z);
+  dolly.rotation.y = 0;
+  yaw = 0; pitch = 0;
+  if(mobileMode){
+    minimapPlane.visible = false;
+    minimapMobileWrap.classList.remove('hidden');
+    hudPlane.position.set(0, -0.24, -0.5);
+  } else {
+    minimapPlane.visible = true;
+    minimapMobileWrap.classList.add('hidden');
+    if(renderer.xr.isPresenting){
+      minimapPlane.position.set(-0.2, 0.07, -0.5);
+      hudPlane.position.set(0, -0.32, -0.5);
+    } else {
+      minimapPlane.position.set(-0.32, 0.2, -0.5);
+      hudPlane.position.set(0, -0.22, -0.5);
+    }
+  }
+  drawHUD();
+  state.running = true;
+  overlayStart.classList.add('hidden');
+  overlayEnd.classList.add('hidden');
+  hintEl.classList.remove('hidden');
+  startMusic();
+}
+
+function endGame(){
+  state.running = false;
+  hintEl.classList.add('hidden');
+  mobileControlsEl.classList.add('hidden');
+  closeQuestionPanel();
+  if(renderer.xr.isPresenting){
+    const session = renderer.xr.getSession();
+    if(session) session.end();
+  }
+  document.getElementById('stat-correct').textContent = state.correct;
+  document.getElementById('stat-wrong').textContent = state.wrong;
+  document.getElementById('stat-kills').textContent = state.mummyKills;
+  document.getElementById('stat-hits').textContent = state.mummyHits;
+  document.getElementById('stat-total').textContent = state.score;
+  document.getElementById('result-player-name').textContent = playerName;
+
+  elapsedSeconds = Math.max(0, Math.round((performance.now() - gameStartTime)/1000));
+  const mm = Math.floor(elapsedSeconds/60);
+  const ss = String(elapsedSeconds%60).padStart(2,'0');
+  document.getElementById('stat-time').textContent = `${mm}:${ss}`;
+
+  const tbody = document.querySelector('#results-table tbody');
+  tbody.innerHTML = '';
+  state.answers.forEach((a,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${a.question}</td>
+      <td>${a.chosen}</td>
+      <td>${a.correct ? '<span class="tag ok">Acierto</span>' : '<span class="tag bad">Fallo</span>'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  overlayEnd.classList.remove('hidden');
+}
+
+function requireNameOrWarn(){
+  const val = (document.getElementById('player-name').value || '').trim();
+  if(!val){
+    startStatus.textContent = 'Escribe tu nombre antes de empezar.';
+    startStatus.classList.add('warn');
+    document.getElementById('player-name').focus();
+    return false;
+  }
+  startStatus.textContent = '';
+  startStatus.classList.remove('warn');
+  return true;
+}
+
+document.getElementById('btn-desktop').addEventListener('click', ()=>{
+  if(!requireNameOrWarn()) return;
+  desktopMode = true;
+  mobileMode = false;
+  mobileControlsEl.classList.add('hidden');
+  startGame();
+});
+
+document.getElementById('btn-mobile').addEventListener('click', ()=>{
+  if(!requireNameOrWarn()) return;
+  mobileMode = true;
+  desktopMode = false;
+  requestFullscreenSafe();
+  mobileControlsEl.classList.remove('hidden');
+  startGame();
+});
+
+document.getElementById('btn-restart').addEventListener('click', ()=>{
+  overlayEnd.classList.add('hidden');
+  overlayStart.classList.remove('hidden');
+});
+
+document.getElementById('btn-share').addEventListener('click', async ()=>{
+  let text = 'Resultados — Laberinto VR de Preguntas :-)\n';
+  text += 'IES Santa Engracia · STEAM 4.0 - SCS\n\n';
+  text += `Jugador: ${playerName}\n`;
+  text += `Puntuación final: ${state.score}\n`;
+  text += `Tiempo total: ${document.getElementById('stat-time').textContent}\n`;
+  text += `Aciertos: ${state.correct}/${state.answers.length}\n`;
+  text += `Enemigos abatidos: ${state.mummyKills}\n`;
+  text += `Golpes recibidos: ${state.mummyHits}\n\n`;
+  text += 'Detalle de respuestas:\n';
+  state.answers.forEach((a,i)=>{
+    text += `${i+1}. ${a.question}\n   → ${a.chosen} ${a.correct ? '(✅ correcta)' : '(❌ incorrecta)'}\n`;
+  });
+
+  const statusEl = document.getElementById('share-status');
+  try{
+    if(navigator.share){
+      // Nota: se comparte solo "text" (sin "title" ni "url"), ya que algunas apps
+      // como WhatsApp solo leen ese campo y rechazan el contenido como "vacío"
+      // si el navegador reparte el mensaje entre "title" y "text".
+      await navigator.share({ text });
+      statusEl.textContent = '';
+    } else {
+      await navigator.clipboard.writeText(text);
+      statusEl.textContent = 'Resultados copiados al portapapeles ✅';
+    }
+  }catch(err){
+    if(err && err.name === 'AbortError'){
+      statusEl.textContent = '';
+      return;
+    }
+    try{
+      await navigator.clipboard.writeText(text);
+      statusEl.textContent = 'Resultados copiados al portapapeles ✅';
+    }catch(e2){
+      statusEl.textContent = 'No se pudieron compartir los resultados.';
+    }
+  }
+});
+
+/* ---------- botón VR ---------- */
+if('xr' in navigator){
+  navigator.xr.isSessionSupported('immersive-vr').then(supported=>{
+    if(supported){
+      const btn = VRButton.createButton(renderer);
+      // el texto por defecto de VRButton ("ENTER VR") se sustituye, y se vigila
+      // por si la propia librería lo vuelve a escribir de forma asíncrona
+      const relabelVrButton = ()=>{
+        if(btn.textContent.trim().toUpperCase() === 'ENTER VR'){
+          btn.textContent = 'ENTRAR en VR';
+        }
+      };
+      relabelVrButton();
+      new MutationObserver(relabelVrButton).observe(btn, { childList:true, characterData:true, subtree:true });
+      // valida el nombre ANTES de que el propio VRButton abra la sesión inmersiva
+      btn.addEventListener('click', (e)=>{
+        if(!requireNameOrWarn()){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      }, true);
+      document.getElementById('vr-btn-slot').appendChild(btn);
+      renderer.xr.addEventListener('sessionstart', ()=>{
+        desktopMode = false;
+        mobileMode = false;
+        mobileControlsEl.classList.add('hidden');
+        startGame();
+      });
+      renderer.xr.addEventListener('sessionend', ()=>{
+        if(state.running) endGame();
+      });
+    } else {
+      startStatus.textContent = 'Este navegador no soporta WebXR inmersivo. Puedes probar en modo escritorio o abrir esta página desde el navegador de tus gafas Meta Quest 3.';
+    }
+  });
+} else {
+  startStatus.textContent = 'WebXR no está disponible en este navegador. Ábrelo desde el navegador de tus gafas Meta Quest 3, o prueba el modo escritorio.';
+}
+</script>
+</body>
+</html>
