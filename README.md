@@ -1,1 +1,1 @@
-# LaberintoVR
+# LaberintoVR-Geografia
